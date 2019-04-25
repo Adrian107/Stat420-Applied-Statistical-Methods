@@ -1,0 +1,331 @@
+---
+title: "STAT 420 Final project"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#part one
+train = read.csv(file="C:/Users/Hans/Desktop/training.csv", header=TRUE)
+#Log transformation
+fit9 = lm(log(health)~PCDH12+DLG5+BC038559+SHISA5+AF161342+CARKD+F2R+PHKG1+CDCP1+PLEKHM1+SMC2+PSMB6+BX440400+A_24_P936373+PPAN+BC007917+C14orf143+LOC440104+THC2578957+ANKIB1,data = train)
+summary(fit9)$r.squared
+AIC(fit9)
+```
+
+```{r}
+#Box-cox transformation
+library(MASS)
+bc = boxcox(health~PCDH12+DLG5+BC038559+SHISA5+AF161342+CARKD+F2R+PHKG1+CDCP1+PLEKHM1+SMC2+PSMB6+BX440400+A_24_P936373+PPAN+BC007917+C14orf143+LOC440104+THC2578957+ANKIB1,data = train,plotit = FALSE)
+lambda = bc$x[which.max(bc$y)]
+health_1 = ((train$health^lambda)-1)/lambda
+fit = lm((health_1)~PCDH12+DLG5+BC038559+SHISA5+AF161342+CARKD+F2R+PHKG1+CDCP1+PLEKHM1+SMC2+PSMB6+BX440400+A_24_P936373+PPAN+BC007917+C14orf143+LOC440104+THC2578957+ANKIB1,data = train)
+summary(fit)$r.squared
+AIC(fit)
+# Based on the r-square for both y-transformation, even though box-cox has slight lower r-square than log transformation, 
+# but box-cox's AIC and BIC is much smaller than log's, which means that box-cox has better goodness-of-fit, thus, we
+# choose box-cox transformation to do the diagnostics.
+```
+
+```{r}
+#Residuals and Normality check
+res = fit$residuals
+plot(res)
+his = hist(res, main = "residual plot")
+shapiro.test(res)
+xgrid =seq(min(res) ,max(res) ,length=100)
+yden =dnorm( xgrid ,mean=0,sd=0.2083) 
+yden = yden*length (res)* diff (his$mids[1:2])
+lines(xgrid , yden, col="blue", lwd=2)
+
+# Based on the graph shown below, the residuals plots does not have pattern but there are some points
+# far away from the main trend, Shapiro-Wilk normality test is less than 0.05, so it does not follow normality, so we should be careful about them. In addition, the historgram tell
+# us the similar result, which is the plot has slighly left-skewed, so it might need some adjustments. 
+```
+
+```{r}
+# Cook's Distance & Outliers
+plot(cooks.distance(fit))
+text(cooks.distance(fit))
+
+# After normality check, we use cook.distance() method to see which point is most far from other points
+# and we would consider removing it one at a time. The first point that will be toss out is 11.
+``` 
+
+```{r}
+#Remove point 11
+train1=train[c(-11),]
+health_1 = ((train1$health^lambda)-1)/lambda
+fit1 = lm(health_1~train1$PCDH12+DLG5+BC038559+SHISA5+AF161342+CARKD+F2R+PHKG1+CDCP1+PLEKHM1+SMC2+PSMB6+BX440400+A_24_P936373+PPAN+BC007917+C14orf143+LOC440104+THC2578957+ANKIB1,data = train1)
+summary(fit1)$r.squared
+res1 = fit1$residuals
+his1 = hist(res1, main = "residual plot")
+shapiro.test(res1)
+
+sigma1 = sqrt(sum(fit1$residuals^2)/fit1$df.residual)
+perct1 = (rank(res1) - 0.5)/length(res1)
+z1 = qnorm(perct1)
+plot(z1, res1/sigma1, xlab = "theoritical value", ylab = "observed residuals")
+text(z1, res1/sigma1, c(1:length(res),pos=3))
+
+# After removing point 11, the r-squared has obviously increase from 0.6478009 to 0.6875, indicating that this model become better with removing 
+# point 11. Also, the QQ plot and histogram look better than the previous one. 
+
+```
+
+```{r}
+#Remove point 15
+train2=train1[c(-15),]
+health_1 = ((train2$health^lambda)-1)/lambda
+fit2 = lm(health_1~PCDH12+DLG5+BC038559+SHISA5+AF161342+CARKD+F2R+PHKG1+CDCP1+PLEKHM1+SMC2+PSMB6+BX440400+A_24_P936373+PPAN+BC007917+C14orf143+LOC440104+THC2578957+ANKIB1,data = train2)
+summary(fit2)$r.squared
+res2 = fit2$residuals
+his2 = hist(res2, main = "residual plot")
+shapiro.test(res2)
+
+sigma2 = sqrt(sum(fit2$residuals^2)/fit2$df.residual)
+perct2 = (rank(res2) - 0.5)/length(res2)
+z2 = qnorm(perct2)
+plot(z2, res2/sigma2, xlab = "theoritical value", ylab = "observed residuals")
+text(z2, res2/sigma2, c(1:length(res2),pos=3))
+
+# With taking out point 15, the r-squared have a big increasement and the p-value for normality test is much 
+# larger and it is greater than 0.05, which states that there are bigger variation the model could explain and this data is more normal. In addition to r-squared, histgarom and QQ plot look much better than the previous two data. 
+
+```
+
+```{r}
+# Codes that located below is for verifying the outlier point that removed above. 
+
+# Cook's Distance & Outliers
+plot(cooks.distance(fit))
+text(cooks.distance(fit))
+plot(cooks.distance(fit1))
+text(cooks.distance(fit1))
+plot(cooks.distance(fit2))
+text(cooks.distance(fit2))
+plot(res2)
+text(res2)
+```
+
+```{r}
+# Summary about Part one
+# # After removing outliers
+
+#Histogram plot
+hist(res2)
+
+#Normality test
+shapiro.test(res2)
+
+summary(fit2)
+# In accordance with the result that summary function generated, the estimated parameter is (Intercept)  -0.625281   PCDH12       -0.286096 DLG5         -0.302519 BC038559     -0.020688 SHISA5        0.165758 AF161342      0.136363CARKD         0.048259F2R           0.422555PHKG1         0.147251 CDCP1         0.013843 PLEKHM1       0.732921 SMC2          0.005896 PSMB6        -0.013602 BX440400      0.006481 A_24_P936373  0.044472  PPAN          0.092661 BC007917     -0.038175  C14orf143     0.041637  LOC440104    -0.021037   THC2578957    0.064086  ANKIB1       -0.006277                                                                The residual standard error is 0.1878 on 267 degrees of freedom          Multiple R-squared:  0.7154,	Adjusted R-squared:  0.6941        F-statistic: 33.56 on 20 and 267 DF,  p-value: < 2.2e-16              Among those variables, intercept, PCDH12,DLG5,SHISA5, AF161342, CARKD, F2R, PHKG1,PLEKHM1,PPAN,C14orf143  
+
+
+# AIC
+AIC(fit2)
+
+#BP test
+library(lmtest)
+bptest(fit2)
+
+# The histgram looks much better. BP test tells us that the constant variance of the residuals is accepted, indicating that this is a good model fitting. 
+```
+
+```{r}
+# AIC & BIC before X transformation and model selection
+AIC(fit)
+BIC(fit)
+AIC(fit2)
+BIC(fit2)
+# Decreasing value means better goodness-of-fit
+
+```
+
+# PART TWO
+
+```{r warnings = FALSE}
+library(PerformanceAnalytics)
+suppressWarnings(chart.Correlation(train))
+
+# After taking look at this graph, I decided to do six variables transformation. 
+```
+
+```{r}
+# X Transformation
+#log
+PCDH12_1 = log(train$PCDH12)
+AF161342_1 = log(train$AF161342+1)
+CARKD_1 = log(train$CARKD)
+SMC2_1 = log(train$SMC2)
+A_24_P936373_1 = log(train$A_24_P936373)
+C14orf143_1 = log(train$C14orf143)
+
+fit3 = lm(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train)
+summary(fit3)$r.squared
+plot(cooks.distance(fit3))
+text(cooks.distance(fit3))
+# In the plot of cook's distance that already transform six x variables, I see that both 11 and 16 point are far away from rest points, so removing them one at a time. 
+```
+
+```{r}
+sort(cooks.distance(fit3),decreasing = TRUE)[1:3]
+# Removing point 11
+train4=train[c(-11),]
+PCDH12_1 = log(train4$PCDH12)
+AF161342_1 = log(train4$AF161342+1)
+CARKD_1 = log(train4$CARKD)
+SMC2_1 = log(train4$SMC2)
+A_24_P936373_1 = log(train4$A_24_P936373)
+C14orf143_1 = log(train4$C14orf143)
+
+fit4 = lm(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train4)
+summary(fit4)$r.squared
+# In the first, we have clue that 11 should be remove based on the sort function. 
+```
+
+```{r}
+sort(cooks.distance(fit4),decreasing = TRUE)[1:3]
+# Removing point 15
+train5 = train4[c(-15),]
+PCDH12_1 = log(train5$PCDH12)
+AF161342_1 = log(train5$AF161342+1)
+CARKD_1 = log(train5$CARKD)
+SMC2_1 = log(train5$SMC2)
+A_24_P936373_1 = log(train5$A_24_P936373)
+C14orf143_1 = log(train5$C14orf143)
+
+fit5 = lm(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train5)
+summary(fit5)$r.squared
+# Aftering tossing out point 11, 16 and 253 have the biggest cook's distance and it is ten times of point 218. Thus, after removing 16(15 because 11 was removed in the previous steps), the r-squared have a big jump, and it turns to be 0.699
+
+```
+
+```{r}
+sort(cooks.distance(fit5),decreasing = TRUE)[1:3]
+# Removing point 252
+train6 = train4[c(-252),]
+PCDH12_1 = log(train6$PCDH12)
+AF161342_1 = log(train6$AF161342+1)
+CARKD_1 = log(train6$CARKD)
+SMC2_1 = log(train6$SMC2)
+A_24_P936373_1 = log(train6$A_24_P936373)
+C14orf143_1 = log(train6$C14orf143)
+
+fit6 = lm(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train6)
+summary(fit6)$r.squared
+# From this step, the points of 253 have more than two times of value than 218's, so deciding to take 253 out.
+
+```
+
+```{r}
+sort(cooks.distance(fit6),decreasing = TRUE)[1:3]
+# Removing point 15
+train7 = train6[c(-15),]
+PCDH12_1 = log(train7$PCDH12)
+AF161342_1 = log(train7$AF161342+1)
+CARKD_1 = log(train7$CARKD)
+SMC2_1 = log(train7$SMC2)
+A_24_P936373_1 = log(train7$A_24_P936373)
+C14orf143_1 = log(train7$C14orf143)
+
+fit7 = lm(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train7)
+summary(fit7)$r.squared
+
+# point 16 is another point should be removed. The r-squared become 0.7076539, which is a huge jump from the last model. 
+
+```
+
+```{r}
+
+sort(cooks.distance(fit7),decreasing = TRUE)[1:3]
+# Removing point 218
+train8 = train7[c(-216),]
+PCDH12_1 = log(train8$PCDH12)
+AF161342_1 = log(train8$AF161342+1)
+CARKD_1 = log(train8$CARKD)
+SMC2_1 = log(train8$SMC2)
+A_24_P936373_1 = log(train8$A_24_P936373)
+C14orf143_1 = log(train8$C14orf143)
+
+fit8 = lm(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train8)
+summary(fit8)$r.squared
+
+
+
+# After deciding tossing out point 218, because it have more than two times value of the second largest value point, 
+sort(cooks.distance(fit8),decreasing = TRUE)[1:5]
+plot(cooks.distance(fit8))
+#upon here, we would like to conclude that all of the outliers are removed, since the 
+# largest six cook's distance is very close and could seen in the graph. 
+
+```
+
+
+```{r}
+# Best subset
+# install.packages("leaps")
+library("leaps")
+PCDH12_1 = log(train8$PCDH12)
+AF161342_1 = log(train8$AF161342+1)
+CARKD_1 = log(train8$CARKD)
+SMC2_1 = log(train8$SMC2)
+A_24_P936373_1 = log(train8$A_24_P936373)
+C14orf143_1 = log(train8$C14orf143)
+RSSleaps=regsubsets(health~PCDH12_1+DLG5+BC038559+SHISA5+AF161342_1+CARKD_1+F2R+PHKG1+CDCP1+PLEKHM1+SMC2_1+PSMB6+BX440400+A_24_P936373_1+PPAN+BC007917+C14orf143_1+LOC440104+THC2578957+ANKIB1,data = train8, nvmax = 20)
+RSSleaps=regsubsets(train8[,3:22],train8[,2],nvmax = 20)
+sumleaps=summary(RSSleaps,matrix=T)
+sumleaps$which
+inrange = function(x) { (x - min(x)) / (max(x) - min(x)) }
+
+sumleaps = summary(RSSleaps,matrix=T)
+msize = apply(sumleaps$which,1,sum)
+n=nrow(train8)
+p=nrow(train8)
+Cp = sumleaps$rss/(summary(fit8)$sigma^2) + 2*msize - n
+AIC = n*log(sumleaps$rss/n) + 2*msize
+BIC = n*log(sumleaps$rss/n) + msize*log(n)
+Cp1=inrange(Cp)
+BIC1 = inrange(BIC)
+AIC1 = inrange(AIC)
+plot(range(msize), c(0, 1.1), type="n", xlab="Model Size (with Intercept)", ylab="Model Selection Criteria")
+points(msize, Cp1, col="red", type="b")
+points(msize, AIC1, col="blue", type="b")
+points(msize, BIC1, col="black", type="b")
+legend("topright", lty=rep(1,3), col=c("red", "blue", "black"), cex = 2, legend=c("Cp", "AIC", "BIC"))
+AIC
+BIC
+Cp
+
+```
+
+```{r}
+library(car)
+fit99 = lm(health~ PCDH12+DLG5+BC038559+SHISA5+AF161342+CARKD+F2R+PHKG1+CDCP1+PLEKHM1+SMC2+PSMB6+BX440400+A_24_P936373+PPAN+BC007917+C14orf143+LOC440104+THC2578957+ANKIB1,data = train)
+vif(fit99)
+# F2R variable is greater than 5, so we should consider remove it and it is problematic.
+```
+
+```{r}
+# By implementing both stepwise and best subset method, we get the same result, wich keep 
+# PCDH12_1+DLG5+SHISA5+AF161342_1+CARKD_1 +F2R+PHKG1+PLEKHM1+ SMC2_1+PSMB6+A_24_P936373_1+C14orf143_1 +LOC440104+THC2578957
+PCDH12_1 = log(train8$PCDH12)
+AF161342_1 = log(train8$AF161342+1)
+CARKD_1 = log(train8$CARKD)
+SMC2_1 = log(train8$SMC2)
+A_24_P936373_1 = log(train8$A_24_P936373)
+C14orf143_1 = log(train8$C14orf143)
+fit11 = lm(health ~ PCDH12_1+DLG5+SHISA5+AF161342_1+CARKD_1 +F2R+PHKG1+PLEKHM1+ SMC2_1+PSMB6+A_24_P936373_1+C14orf143_1 +LOC440104+THC2578957, data = train8)
+summary(fit11)
+write.csv(predict(fit11), file = "fitted value")
+# so the final model would be 
+# health = -3.75342+ PCDH12_1+DLG5+SHISA5+AF161342_1+CARKD_1 +F2R+PHKG1+PLEKHM1+ SMC2_1+PSMB6+A_24_P936373_1+C14orf143_1 +LOC440104+THC2578957
+```
+
